@@ -1,6 +1,6 @@
 import numpy
 from abc import ABC
-import time
+import os
 import threading
 import pygame
 
@@ -15,7 +15,6 @@ class Observable(ABC):
         self.observer_list.remove(observer)
 
     def notify(self):
-        print("Notify the Observer")
         for observer in self.observer_list:
             observer.update()
 
@@ -25,18 +24,17 @@ class ObserverInterface(ABC):
         pass
 
 
-class GameRoundTimer(Observable):
-    def __init__(self, time_to_run):
+class GameRoundTimer(Observable, threading.Thread):
+    def __init__(self, time_to_run, event):
+        threading.Thread.__init__(self)
         self.time_to_run = time_to_run
-        self.run_timer()
+        self.stopped = event
 
-    def run_timer(self):
-
-        threading.Timer(self.time_to_run, self.notifier).start()
+    def run(self):
+        while not self.stopped.wait(self.time_to_run):
+            self.notifier()
 
     def notifier(self):
-        print("call method notifier")
-        print(time.ctime())
         super().notify()
 
     def stop_timer(self):
@@ -80,7 +78,7 @@ class SnakeHead(SnakeCell):
         if self.direction == Direction.DOWN:
             self.y_position = self.y_position + 1
         elif self.direction == Direction.UP:
-            self.y_position = self.y_position - 1
+            self.x_position = self.x_position - 1
         elif self.direction == Direction.LEFT:
             self.x_position = self.x_position - 1
         elif self.direction == Direction.RIGHT:
@@ -141,7 +139,6 @@ class GameField(object):
         return self.game_field[row][col]
 
     def show_game_field(self):
-        print("call show game field")
         s = ""
         for i in range(self.rows):
             for j in range(self.cols):
@@ -150,7 +147,7 @@ class GameField(object):
                 elif self.get_cell(i, j).get_cell_type() == CellType.SNAKE:
                     s += "*"
                 elif self.get_cell(i, j).get_cell_type() == CellType.HEAD:
-                    s += "#"
+                    s += "*"
                 else:
                     s += "-"
             s += "\n"
@@ -160,17 +157,19 @@ class GameField(object):
 class Game(ObserverInterface):
     # start timer
     # in any interval play_a_round
-    def __init__(self, game_field, snake, game_round_timer):
+    def __init__(self, game_field, snake):
         self.game_field = game_field
         self.snake = snake
-        self.game_round_timer = game_round_timer
+        self.stopFlag = threading.Event()
+        self.game_round_timer = GameRoundTimer(0.25, self.stopFlag)
+        self.game_round_timer.start()
         self.game_round_timer.attach(self)
 
     def play_a_round(self):
-        self.game_field.show_game_field()
-        print("play a round")
+        os.system('clear')
+        self.move_snake_head()
+        print(self.game_field.show_game_field())
 
-        # self.move_snake_head()
         # self.is_collision()
         # inform the controller and view to show updated GameField
 
@@ -184,10 +183,9 @@ class Game(ObserverInterface):
                                  self.snake.snakeHead.y_position).set_cell_type(CellType.HEAD)
 
     def is_collision(self):
-        pass
+        self.stopFlag.set()
 
     def update(self):
-        print("call update")
         self.play_a_round()
 
 
@@ -217,10 +215,8 @@ class View(object):
     pass
 
 
-# field = GameField(5, 15)
-# snake = Snake(SnakeHead(3, 14))
-timer = GameRoundTimer(0.5)
-# game = Game(field, snake, timer)
+Game(GameField(25, 35), Snake(SnakeHead(24, 14)))
+
 # view = View()
 # controller = SnakeController(game, view)
 
