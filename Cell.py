@@ -1,6 +1,46 @@
 import numpy
-import abc
+from abc import ABC
+import time
+import threading
 import pygame
+
+
+class Observable(ABC):
+    observer_list = []
+
+    def attach(self, observer):
+        self.observer_list.append(observer)
+
+    def detach(self, observer):
+        self.observer_list.remove(observer)
+
+    def notify(self):
+        print("Notify the Observer")
+        for observer in self.observer_list:
+            observer.update()
+
+
+class ObserverInterface(ABC):
+    def update(self):
+        pass
+
+
+class GameRoundTimer(Observable):
+    def __init__(self, time_to_run):
+        self.time_to_run = time_to_run
+        self.run_timer()
+
+    def run_timer(self):
+
+        threading.Timer(self.time_to_run, self.notifier).start()
+
+    def notifier(self):
+        print("call method notifier")
+        print(time.ctime())
+        super().notify()
+
+    def stop_timer(self):
+        pass
 
 
 class Cell(object):
@@ -101,6 +141,7 @@ class GameField(object):
         return self.game_field[row][col]
 
     def show_game_field(self):
+        print("call show game field")
         s = ""
         for i in range(self.rows):
             for j in range(self.cols):
@@ -116,25 +157,38 @@ class GameField(object):
         return s
 
 
-class Game(object):
+class Game(ObserverInterface):
     # start timer
     # in any interval play_a_round
-    def __init__(self, game_field, snake):
-        self.snake = snake
+    def __init__(self, game_field, snake, game_round_timer):
         self.game_field = game_field
+        self.snake = snake
+        self.game_round_timer = game_round_timer
+        self.game_round_timer.attach(self)
 
     def play_a_round(self):
-        self.move_snake_head()
+        self.game_field.show_game_field()
+        print("play a round")
+
+        # self.move_snake_head()
+        # self.is_collision()
         # inform the controller and view to show updated GameField
 
     def move_snake_head(self):
         # old Head position
-        self.game_field.get_cell(snake.snakeHead.x_position,
-                                 snake.snakeHead.y_position).set_cell_type(CellType.EMPTY)
+        self.game_field.get_cell(self.snake.snakeHead.x_position,
+                                 self.snake.snakeHead.y_position).set_cell_type(CellType.EMPTY)
         # new Head position first and then update the GameField
         self.snake.snakeHead.new_head_position()
-        self.game_field.get_cell(snake.snakeHead.x_position,
-                                 snake.snakeHead.y_position).set_cell_type(CellType.HEAD)
+        self.game_field.get_cell(self.snake.snakeHead.x_position,
+                                 self.snake.snakeHead.y_position).set_cell_type(CellType.HEAD)
+
+    def is_collision(self):
+        pass
+
+    def update(self):
+        print("call update")
+        self.play_a_round()
 
 
 class SnakeController(object):
@@ -163,14 +217,15 @@ class View(object):
     pass
 
 
-field = GameField(5, 15)
-snake = Snake(SnakeHead(3, 14))
-game = Game(field, snake)
-view = View()
-controller = SnakeController(game, view)
+# field = GameField(5, 15)
+# snake = Snake(SnakeHead(3, 14))
+timer = GameRoundTimer(0.5)
+# game = Game(field, snake, timer)
+# view = View()
+# controller = SnakeController(game, view)
 
-field.get_cell(4, 14).set_cell_type(CellType.HEAD)
-print(field.show_game_field())
+# field.get_cell(4, 14).set_cell_type(CellType.HEAD)
+# print(field.show_game_field())
 # for x in range(field.rows):
 #    for y in range(field.cols):
 #        cell = field.get_cell(x, y)
