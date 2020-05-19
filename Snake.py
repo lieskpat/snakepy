@@ -3,6 +3,7 @@ from abc import ABC
 import os
 import threading
 import click
+import sys
 
 
 class Observable(ABC):
@@ -42,9 +43,10 @@ class KeyListener(Observable, threading.Thread):
         self.stopped = event
 
     def run(self):
-        while True:
-            self.key = click.getchar()
-            if self.key == "h" or self.key == "p" or self.key == "k" or self.key == "l":
+        while not self.stopped.wait(0):
+            # self.key = click.getchar()
+            # vim like steering
+            if self.key == "h" or self.key == "j" or self.key == "k" or self.key == "l":
                 super().notify(self)
 
 
@@ -87,7 +89,6 @@ class SnakeHead(SnakeCell):
             self.row_position = self.row_position + 1
         elif self.direction == Direction.UP:
             self.row_position = self.row_position - 1
-            print(self.get_position_with_cell_type())
         elif self.direction == Direction.LEFT:
             self.col_position = self.col_position - 1
         elif self.direction == Direction.RIGHT:
@@ -163,27 +164,15 @@ class GameField(object):
         return s
 
 
-class Game(ObserverInterface):
-    # start timer
-    # in any interval play_a_round
+class Game(object):
+
     def __init__(self, game_field, snake):
         self.game_field = game_field
         self.snake = snake
-        self.stopFlag = threading.Event()
-        self.game_round_timer = GameRoundTimer(0.25, self.stopFlag)
-        self.game_round_timer.start()
-        self.game_round_timer.attach(self)
 
     def play_a_round(self):
         os.system('clear')
-        # click.clear()
-        # self.key_listener()
-        print(self.game_field.show_game_field())
         self.move_snake_head()
-        self.is_collision()
-
-        # self.is_collision()
-        # inform the controller and view to show updated GameField
 
     def move_snake_head(self):
         # old Head position
@@ -199,12 +188,18 @@ class Game(ObserverInterface):
         if self.snake.snakeHead.row_position < 0 and \
                 self.snake.snakeHead.row_position < self.game_field.rows:
             print("out of range" + " " + str(self.snake.snakeHead.row_position))
+            return True
 
-            self.stopFlag.set()
 
-    def update(self, subject):
-        if isinstance(subject, GameRoundTimer):
-            self.play_a_round()
+class View(ABC):
+    def render(self):
+        pass
+
+
+class TerminalView(View):
+
+    def render(self):
+        pass
 
 
 class SnakeController(ObserverInterface):
@@ -213,10 +208,13 @@ class SnakeController(ObserverInterface):
         self.game = game
         # self.view = view
         self.stopFlag = threading.Event()
+        self.game_round_timer = GameRoundTimer(0.25, self.stopFlag)
+        self.game_round_timer.start()
+        self.game_round_timer.attach(self)
         self.key_listener = KeyListener(self.stopFlag)
-        self.key_listener.attach(self)
         # unresolved side effects when i used KeyListener thread
-        # self.key_listener.start()
+        self.key_listener.start()
+        self.key_listener.attach(self)
 
     def which_next_direction(self, key):
         if key == "h":
@@ -244,10 +242,17 @@ class SnakeController(ObserverInterface):
         if isinstance(subject, KeyListener):
             # print(subject.key)
             self.which_next_direction(subject.key)
+        elif isinstance(subject, GameRoundTimer):
+            self.game.play_a_round()
+            sys.stdout.write(self.game.game_field.show_game_field())
+            sys.stdout.flush()
+            if self.game.is_collision():
+                self.stopFlag.set()
 
 
-class View(object):
-    pass
+def main():
+    SnakeController(Game(GameField(20, 20), Snake(SnakeHead(19, 19, Direction.UP))))
 
 
-SnakeController(Game(GameField(20, 20), Snake(SnakeHead(19, 19, Direction.UP))))
+if __name__ == '__main__':
+    main()
